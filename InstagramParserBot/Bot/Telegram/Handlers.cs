@@ -1,6 +1,7 @@
 ﻿using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 
 namespace InstagramParserBot.Bot.Telegram;
 
@@ -30,15 +31,18 @@ public static class Handlers
         CancellationToken cancellationToken
     )
     {
-        // var handler = update.Type switch
-        // {
-        //     UpdateType.Message =>
-        // }
+        var handler = update.Type switch
+        {
+            UpdateType.Message => Events.OnMessageReceivedEvent(botClient, update.Message!)
+        };
 
-        Message sentMessage = await botClient.SendTextMessageAsync(
-            chatId: update.Message.Chat.Id,
-            text: update.Message.Text,
-            cancellationToken: cancellationToken
-        );
+        try
+        {
+            await handler;
+        }
+        catch (Exception exception)
+        {
+            await PollingErrorHandler(botClient, exception, cancellationToken);
+        }
     }
 }
