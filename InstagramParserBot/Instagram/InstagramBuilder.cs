@@ -9,11 +9,18 @@ namespace InstagramParserBot.Instagram;
 
 public static class InstagramBuilder
 {
-    private static IInstaApi _instaApi;
+    private static IInstaApi _instaApi = null!;
+    private static HttpClientHandler _httpClientHandler = null!;
 
-    public static IInstaApi GetInstaApi() => _instaApi;
+    public static async Task<IInstaApi> BuildInstaApi()
+    {
+        if (_instaApi == null!)
+            await Start();
+        
+        return _instaApi!;
+    }
 
-    public static async Task<bool> Start()
+    private static async Task Start()
     {
         var settings = new Settings();
 
@@ -22,6 +29,8 @@ public static class InstagramBuilder
             UserName = settings.GetUserName(),
             Password = settings.GetUserPassword()
         };
+
+        var delay = RequestDelay.FromSeconds(2, 4);
 
         try
         {
@@ -32,8 +41,10 @@ public static class InstagramBuilder
                 _instaApi = InstaApiBuilder.CreateBuilder()
                     .SetUser(userSession)
                     .UseLogger(new DebugLogger(LogLevel.Exceptions))
+                    //.UseLogger(new DebugLogger(LogLevel.Request))
+                    //.UseLogger(new DebugLogger(LogLevel.Response))
                     .UseHttpClientHandler(ConnectProxy(settings))
-                    .SetRequestDelay(RequestDelay.FromSeconds(0, 1))
+                    .SetRequestDelay(delay)
                     .Build();
             }
             else
@@ -43,14 +54,15 @@ public static class InstagramBuilder
                 _instaApi = InstaApiBuilder.CreateBuilder()
                     .SetUser(userSession)
                     .UseLogger(new DebugLogger(LogLevel.Exceptions))
-                    .SetRequestDelay(RequestDelay.FromSeconds(0, 1))
+                    .UseLogger(new DebugLogger(LogLevel.Request))
+                    .SetRequestDelay(delay)
                     .Build();
             }
         }
         catch (Exception exception)
         {
             Console.WriteLine($"[INSTAGRAM API STATUS] Error, exception: {exception}");
-            return false;
+            return;
         }
 
         if (!_instaApi.IsUserAuthenticated)
@@ -58,28 +70,40 @@ public static class InstagramBuilder
             Console.WriteLine($"[INSTAGRAM API STATUS] Logging as {userSession.UserName}");
 
             await _instaApi.SendRequestsBeforeLoginAsync();
-            await Task.Delay(5000);
+
+            await Delay.WaitFiveSeconds();
 
             var loginResult = await _instaApi.LoginAsync();
 
-            if (loginResult.Succeeded)
+            if (loginResult.Succeeded && userSession.UserName == settings.GetUserName())
             {
                 Console.WriteLine($"[INSTAGRAM API STATUS] Connected as {userSession.UserName}");
+                await Delay.WaitFiveSeconds();
                 await _instaApi.SendRequestsAfterLoginAsync();
             }
             else
             {
                 if (loginResult.Value == InstaLoginResult.ChallengeRequired)
-                    await _instaApi.GetChallengeRequireVerifyMethodAsync();
-                
-                Console.WriteLine($"[INSTAGRAM API STATUS] Error, unable to login: {loginResult.Info.Message}");
-                return false;
+                {
+                    var challenge = await _instaApi.GetChallengeRequireVerifyMethodAsync();
+
+                    if (challenge.Succeeded)
+                        Console.WriteLine("[INSTAGRAM API ERROR] Blocked access, need reopen account");
+                    else
+                        Console.WriteLine($"[INSTAGRAM API ERROR] {challenge.Info.Message}");
+                }
+
+                Console.WriteLine($"[INSTAGRAM API ERROR] Unable to login: {loginResult.Info.Message}");
+                return;
             }
         }
 
 
-        Console.WriteLine("[INSTAGRAM API STATUS] Successfully built");
-        return true;
+        Console.WriteLine(
+            $"[INSTAGRAM API STATUS] Successfully built -> " +
+            $"User: [{_instaApi.UserProcessor.GetCurrentUserAsync().Result.Value.Pk}] " +
+            $"[{_instaApi.UserProcessor.GetCurrentUserAsync().Result.Value.UserName}]"
+        );
     }
 
     private static HttpClientHandler ConnectProxy(Settings settings)
@@ -99,14 +123,14 @@ public static class InstagramBuilder
             }
         };
 
-        var httpClientHandler = new HttpClientHandler
+        _httpClientHandler = new HttpClientHandler
         {
             Proxy = proxy
         };
 
-        httpClientHandler.ServerCertificateCustomValidationCallback =
-            (sender, cert, clain, sslPolicyErrors) => true;
+        _httpClientHandler.ServerCertificateCustomValidationCallback =
+            (sender, cert, chain, sslPolicyErrors) => true;
 
-        return httpClientHandler;
+        return _httpClientHandler;
     }
 }

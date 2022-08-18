@@ -1,54 +1,20 @@
-﻿using InstagramApiSharp;
-using InstagramApiSharp.Classes;
-using InstagramApiSharp.Classes.Models;
+﻿using System.Text;
 using InstagramParserBot.Bot;
 using InstagramParserBot.Instagram;
 
+Console.OutputEncoding = Encoding.Unicode; // enable russian lang and other
+
 //await Bot.Start();
 
-await InstagramBuilder.Start();
+var vika = InstagramApiRequest.GetUserByNickname("vika_srgv").Result;
 
-var insta = InstagramBuilder.GetInstaApi();
+Console.WriteLine(vika.FullName + " " + vika.Pk);
 
-Console.WriteLine(insta.AccountProcessor.SetBiographyAsync("говножуй, делаю дела"));
+var list = InstagramApiRequest.GetUserFollowersList(vika.Pk).Result;
 
-var list = new InstaUserShortList();
-var latestMaxId = "";
-
-var danil = await insta.UserProcessor.GetUserAsync("dima_master_dristun");
-// if (!danil.Succeeded)
-//     if (danil.Info.ResponseType == ResponseType.ChallengeRequired)
-//     {
-//         var challengeData = await insta.GetLoggedInChallengeDataInfoAsync();
-//         var acceptChallenge = await insta.AcceptChallengeAsync(); 
-//     }
-
-danil = await insta.UserProcessor.GetUserAsync("dima_master_dristun");
-
-var pk = danil.Value.Pk;
-
-while (latestMaxId != null)
-    bebra();
-
-Console.WriteLine(list.Count);
-Console.WriteLine("---danya milokhin's followers---");
-
-foreach (var user in list)
+for (var i = 0; i < list.Count; i++)
 {
-    Console.WriteLine(user.UserName + " / " + user.FullName);
+    Console.WriteLine($"{i + 1} | {list[i].UserName}");
 }
 
 Console.ReadLine();
-
-async void bebra()
-{
-    Console.WriteLine("ПОШЛА ЖАРА");
-
-    var followers = await insta.UserProcessor
-        .GetUserFollowersByIdAsync(pk, PaginationParameters.MaxPagesToLoad(1).StartFromMaxId(latestMaxId));
-
-    latestMaxId = followers.Value.NextMaxId;
-
-    if (followers.Succeeded)
-        list.AddRange(followers.Value);
-}

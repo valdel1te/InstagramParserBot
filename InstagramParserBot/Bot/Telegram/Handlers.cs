@@ -16,12 +16,12 @@ public static class Handlers
         var errorMessage = exception switch
         {
             ApiRequestException apiRequestException =>
-                $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n[{apiRequestException.Message}]",
+                $"[TELEGRAM API ERROR]: [{apiRequestException.ErrorCode}]\n[{apiRequestException.Message}]",
             
             _ => exception.ToString()
         };
         
-        Console.WriteLine(errorMessage);
+        Console.WriteLine($"[BOT ERROR] {errorMessage}");
         return Task.CompletedTask;
     }
 
