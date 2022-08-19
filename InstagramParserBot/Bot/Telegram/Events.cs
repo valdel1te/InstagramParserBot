@@ -1,4 +1,5 @@
-﻿using InstagramParserBot.Instagram;
+﻿using System.Diagnostics.CodeAnalysis;
+using InstagramParserBot.Instagram;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -10,11 +11,17 @@ public static class Events
     {
         if (message.Text is not { } messageText)
             return;
+        
+        if (message.From!.IsBot)
+            return;
 
-        var split = messageText.Split("\\s+");
+        var split = messageText.Split(" ");
 
-        if (split.Length < 2)
+        if (split.Length != 2)
+        {
             await SendErrorMessage(botClient, message);
+            return;
+        }
 
         var action = split[0] switch
         {
@@ -23,7 +30,8 @@ public static class Events
             _ => SendDefaultAnswer(botClient, message)
         };
 
-        await action;
+        var messageSent = await action;
+        Console.WriteLine($"[BOT STATUS] Sent message to {message.From.Username}");
 
         static async Task<Message> StartParseFollowers(ITelegramBotClient botClient, Message message, string nickname)
         {
@@ -38,7 +46,7 @@ public static class Events
             {
                 return await botClient.SendTextMessageAsync(
                     chatId: message.Chat.Id,
-                    text: "Не нашел такого, то ли приватный, то ли мне отдохнуть надо, то ли ты шиз"
+                    text: "Не нашел такого, то ли аккаунт приватный, то ли мне отдохнуть надо минут 15, то ли ты шизик"
                 );
             }
             
@@ -47,13 +55,13 @@ public static class Events
                 text: $"Нашел!! {search.UserName}, {search.Pk}.\nПробиваю подписчиков"
             );
 
-            var followers = await InstagramApiRequest.GetUserFollowersList(search.Pk);
-            
-            //todo а дальше что ё
+            var followers = InstagramApiRequest.GetUserFollowersList(search.Pk).Result;
+
+            var tempOutput = followers.Aggregate("", (current, follower) => current + (follower.UserName + "\n"));
             
             return await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
-                text: "Полный список подходящих аккаунтов!"
+                text: $"Полный список подходящих аккаунтов!\n{tempOutput}"
             );
         }
 

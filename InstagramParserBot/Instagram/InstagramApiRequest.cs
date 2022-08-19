@@ -3,7 +3,6 @@ using InstagramApiSharp.API;
 using InstagramApiSharp.Classes;
 using InstagramApiSharp.Classes.Models;
 using InstagramParserBot.Tools;
-using Microsoft.VisualBasic.CompilerServices;
 
 namespace InstagramParserBot.Instagram;
 
@@ -16,7 +15,7 @@ public static class InstagramApiRequest
 
     private static async Task StartRequest()
     {
-        await Delay.WaitFiveSeconds();
+        await Delay.WaitThreeSeconds();
 
         _requestCount++;
 
@@ -65,7 +64,7 @@ public static class InstagramApiRequest
         do
         {
 
-            //await StartRequest();
+            await StartRequest();
 
             var followers = await Api.UserProcessor
                 .GetUserFollowersByIdAsync(id, PaginationParameters.MaxPagesToLoad(1).StartFromMaxId(latestMaxId));
@@ -85,7 +84,7 @@ public static class InstagramApiRequest
             latestMaxId = followers.Value.NextMaxId;
             followersList.AddRange(followers.Value);
 
-        } while (string.IsNullOrEmpty(latestMaxId));
+        } while (!string.IsNullOrEmpty(latestMaxId));
 
         Console.WriteLine($"[API REQUEST STATUS] Parsed {followersList.Count} users");
         
