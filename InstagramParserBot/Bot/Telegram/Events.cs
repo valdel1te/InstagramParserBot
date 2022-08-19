@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using InstagramParserBot.Instagram;
+﻿using InstagramParserBot.Instagram;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -55,7 +54,7 @@ public static class Events
                 text: $"Нашел!! {search.UserName}, {search.Pk}.\nПробиваю подписчиков"
             );
 
-            var followers = InstagramApiRequest.GetUserFollowersList(search.Pk).Result;
+            var followers = InstagramApiRequest.GetUserFollowersListWithKeyWords(search.Pk).Result;
 
             var tempOutput = followers.Aggregate("", (current, follower) => current + (follower.UserName + "\n"));
             

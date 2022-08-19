@@ -52,7 +52,7 @@ public static class InstagramApiRequest
         return user.Value;
     }
 
-    public static async Task<InstaUserShortList> GetUserFollowersList(long id)
+    public static async Task<InstaUserShortList> GetUserFollowersListWithKeyWords(long id)
     {
         await StartRequest();
 
@@ -60,14 +60,17 @@ public static class InstagramApiRequest
         
         var latestMaxId = "";
         var followersList = new InstaUserShortList();
+        var keyWords = new Settings().GetKeyWords();
 
         do
         {
 
             await StartRequest();
 
-            var followers = await Api.UserProcessor
+            var allFollowers = await Api.UserProcessor
                 .GetUserFollowersByIdAsync(id, PaginationParameters.MaxPagesToLoad(1).StartFromMaxId(latestMaxId));
+
+            var followers = allFollowers;
 
             if (followers.Info.ResponseType == ResponseType.RequestsLimit)
             {
