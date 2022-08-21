@@ -52,46 +52,91 @@ public static class InstagramApiRequest
         return user.Value;
     }
 
-    public static async Task<InstaUserShortList> GetUserFollowersListWithKeyWords(long id)
+    public static async Task<List<InstagramUserData>> GetUserFollowersListWithKeyWords(long id, string search)
     {
         await StartRequest();
 
         Console.WriteLine($"[API REQUEST STATUS] Parsing user's '{id}' followers list..");
-        
+
         var latestMaxId = "";
-        var followersList = new InstaUserShortList();
-        var keyWords = new Settings().GetKeyWords();
+        var sortedFollowers = new List<InstagramUserData>();
 
         do
         {
-
             await StartRequest();
 
             var allFollowers = await Api.UserProcessor
-                .GetUserFollowersByIdAsync(id, PaginationParameters.MaxPagesToLoad(1).StartFromMaxId(latestMaxId));
+                .GetUserFollowersByIdAsync(
+                    id,
+                    PaginationParameters.MaxPagesToLoad(1).StartFromMaxId(latestMaxId),
+                    search
+                );
 
-            var followers = allFollowers;
-
-            if (followers.Info.ResponseType == ResponseType.RequestsLimit)
+            if (allFollowers.Info.ResponseType == ResponseType.RequestsLimit)
             {
                 Console.WriteLine($"[API REQUEST STATUS] Requests limit reached, waiting 15 minutes..");
                 await Delay.Wait(15 * 60);
             }
 
-            if (!followers.Succeeded)
+            if (!allFollowers.Succeeded)
             {
-                Console.WriteLine($"[API REQUEST ERROR] {followers.Info.Message}");
-                return followersList; // return not fully version
+                Console.WriteLine($"[API REQUEST ERROR] {allFollowers.Info.Message}");
+                return FilterFollowers(allFollowers.Value).Result; // return not fully version
             }
 
-            latestMaxId = followers.Value.NextMaxId;
-            followersList.AddRange(followers.Value);
-
+            latestMaxId = allFollowers.Value.NextMaxId;
+            sortedFollowers.AddRange(FilterFollowers(allFollowers.Value).Result);
         } while (!string.IsNullOrEmpty(latestMaxId));
 
-        Console.WriteLine($"[API REQUEST STATUS] Parsed {followersList.Count} users");
-        
-        return followersList;
+        Console.WriteLine($"[API REQUEST STATUS] Found {sortedFollowers.Count} users");
+
+        return sortedFollowers;
+    }
+
+    private static async Task<List<InstagramUserData>> FilterFollowers(InstaUserShortList users)
+    {
+        Console.WriteLine("[API REQUEST STATUS] Start sorting with key words..");
+
+        var sortedList = new List<InstagramUserData>();
+        var keyWords = new Settings().GetKeyWords();
+
+        foreach (var user in users)
+        {
+            await StartRequest();
+
+            var userFullDataResult = Api.UserProcessor.GetFullUserInfoAsync(user.Pk).Result;
+
+            if (!userFullDataResult.Succeeded)
+            {
+                Console.WriteLine($"[API REQUEST ERROR] {userFullDataResult.Info.Message}. Continue sorting..");
+                continue;
+            }
+
+            var userFullData = userFullDataResult.Value.UserDetail;
+
+            if (keyWords.Any(key =>
+                    userFullData.Username.Contains(key)
+                    || userFullData.Biography.Contains(key)
+                    || userFullData.FullName.Contains(key)
+                )
+               )
+            {
+                Console.WriteLine("[API REQUEST STATUS] Found one user!!");
+
+                sortedList.Add(new InstagramUserData
+                {
+                    UserName = userFullData.Username,
+                    FullName = userFullData.FullName,
+                    ContactNumber = userFullData.ContactPhoneNumber,
+                    PublicNumber = userFullData.PublicPhoneNumber.Replace("+7", "8"),
+                    Url = $"https://www.instagram.com/{userFullData.Username}/",
+                    City = userFullData.CityName,
+                    OtherInfo = userFullData
+                });
+            }
+        }
+
+        return sortedList;
     }
 
     public static async Task<int> GetUserFollowersCount(InstaUser user)
@@ -106,10 +151,11 @@ public static class InstagramApiRequest
         {
             if (user.IsPrivate)
             {
-                Console.WriteLine($"[API REQUEST STATUS] User '{user.UserName}' has private account, can't complete request");
+                Console.WriteLine(
+                    $"[API REQUEST STATUS] User '{user.UserName}' has private account, can't complete request");
                 return 0;
             }
-            
+
             count = user.FollowersCount;
         }
         catch (Exception exception)
