@@ -12,24 +12,12 @@ public static class UserStatement
 
     public static void AddUser(long id) => UserStatementsMap.Add(id, new UserMessageStatement());
     public static void RemoveUser(long id) => UserStatementsMap.Remove(id);
-
-    public static void EndWorkWithFollowersList(long id) =>
-        UserStatementsMap[id].Status = Status.WaitingWithNumbersBase;
-
-    public static void StartWorkWithFollowersList(long id) =>
-        UserStatementsMap[id].Status = Status.WorkingWithFollowersList;
-
-    /* развить идею этого варианта будет хорошо только в случае желания сделать проект максимально удобным для множества пользователей
-    public static void ConfirmAddedNumbersBase(long id) =>
-        UserStatementsMap[id].Status = Statement.WaitingWithNumbersBase;
-    */
 }
 
 public enum Status
 {
     WaitingWithNumbersBase,
     WorkingWithFollowersList
-    //WaitingWithoutNumbersBase
 }
 
 public sealed class UserMessageStatement

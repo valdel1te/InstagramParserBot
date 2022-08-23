@@ -19,6 +19,19 @@ public static class Events
         if (!UserStatement.UserAlreadyAdded(message.Chat.Id))
             UserStatement.AddUser(message.Chat.Id);
 
+        var userStatement = UserStatement.GetStatement(message.Chat.Id);
+        
+        if (userStatement.Status == Status.WorkingWithFollowersList)
+        {
+            var index = Convert.ToInt32(messageText);
+            if (index >= 0 && index < userStatement.UserDataList.Count)
+            {
+                userStatement.NextUserDataIndex = index;
+                await SendFollowerInfoMessage(userStatement, message.Chat.Id, botClient);
+                return;
+            }
+        }
+
         var split = messageText.Split(" ");
 
         if (split.Length is > 3 or < 2)
@@ -178,7 +191,8 @@ public static class Events
             $"3. Контактный номер: `{user.ContactNumber}`\n" +
             $"4. Публичный номер: `{user.PublicNumber}`\n" +
             $"5. Город: `{user.City}\n`" +
-            "\n*При наличии нужды имзенить некоторые свойства, нажмите 1-5 соответственно*";
+            "\n*При наличии нужды имзенить некоторые свойства, нажмите 1-5 соответственно*\n" +
+            "_Чтобы выбрать конкретный номер аккаунта в списке, отправьте ниже соответствующий индекс_";
 
         var inlineKeyboard = CreateInlineReplyMarkupForFollowersList(user.Url);
 
