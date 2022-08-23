@@ -20,16 +20,20 @@ public static class Events
             UserStatement.AddUser(message.Chat.Id);
 
         var userStatement = UserStatement.GetStatement(message.Chat.Id);
-        
+
         if (userStatement.Status == Status.WorkingWithFollowersList)
         {
-            var index = Convert.ToInt32(messageText);
-            if (index >= 0 && index < userStatement.UserDataList.Count)
+            if (int.TryParse(messageText, out var index))
             {
-                userStatement.NextUserDataIndex = index;
-                await SendFollowerInfoMessage(userStatement, message.Chat.Id, botClient);
-                return;
+                if (index >= 0 && index < userStatement.UserDataList.Count)
+                {
+                    userStatement.NextUserDataIndex = index - 1;
+                    await SendFollowerInfoMessage(userStatement, message.Chat.Id, botClient);
+                }
             }
+
+            await DeleteMessage(botClient, message);
+            return;
         }
 
         var split = messageText.Split(" ");
@@ -159,7 +163,7 @@ public static class Events
             userMessageStatement.IncrementIndex();
         if (moveBack)
             userMessageStatement.DecrementIndex();
-        
+
         var nextUserDataIndex = userMessageStatement.NextUserDataIndex;
         var userDataList = userMessageStatement.UserDataList;
         var editMessageId = userMessageStatement.MessageId;
@@ -204,6 +208,9 @@ public static class Events
             parseMode: ParseMode.Markdown
         );
     }
+
+    private static async Task DeleteMessage(ITelegramBotClient botClient, Message message) =>
+        await botClient.DeleteMessageAsync(chatId: message.Chat.Id, messageId: message.MessageId);
 
     private static InlineKeyboardMarkup CreateInlineReplyMarkupForFollowersList(string url) =>
         new(new[]
