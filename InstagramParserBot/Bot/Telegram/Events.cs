@@ -1,5 +1,4 @@
 ﻿using InstagramParserBot.Instagram;
-using Org.BouncyCastle.Crypto.Tls;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -16,6 +15,9 @@ public static class Events
 
         if (message.From!.IsBot)
             return;
+
+        if (!UserStatement.UserAlreadyAdded(message.Chat.Id))
+            UserStatement.AddUser(message.Chat.Id);
 
         var split = messageText.Split(" ");
 
@@ -42,6 +44,8 @@ public static class Events
             string searchWord
         )
         {
+            var userMessageStatement = UserStatement.GetStatement(message.Chat.Id);
+
             await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Начинаю искать заданного пользователя.."
@@ -53,13 +57,13 @@ public static class Events
             {
                 return await botClient.SendTextMessageAsync(
                     chatId: message.Chat.Id,
-                    text: "Не нашел такого, то ли аккаунт приватный, то ли мне отдохнуть надо минут 15, то ли ты шизик"
+                    text: "Не нашел такого, то ли мне отдохнуть надо минут 15, то ли ты шизик"
                 );
             }
 
             await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
-                text: $"Нашел!! {search.UserName}, {search.Pk}.\nПробиваю подписчиков"
+                text: $"Нашел!! USERNAME: {search.UserName}, ID: {search.Pk}.\nПробиваю подписчиков"
             );
 
             var followers = InstagramApiRequest
@@ -68,78 +72,16 @@ public static class Events
 
             //var tempOutput = followers.Aggregate("", (current, follower) => current + (follower.UserName + "\n"));
 
-            await botClient.SendTextMessageAsync(
+            var botMessage = await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Полный список подходящих аккаунтов!"
             );
 
-            foreach (var user in followers)
-            {
-                var text =
-                    $"1. Пользователь *{user.UserName}*\n" +
-                    $"2. Полное имя: `{user.FullName}`\n" +
-                    $"3. Контактный номер: `{user.ContactNumber}`\n" +
-                    $"4. Публичный номер: `{user.PublicNumber}`\n" +
-                    $"5. Город: `{user.City}\n`" +
-                    "\nПри наличии нужды имзенить некоторые свойства, нажмите 1-5 соответственно";
+            userMessageStatement.UserDataList = followers;
+            userMessageStatement.Status = Status.WorkingWithFollowersList;
+            userMessageStatement.MessageId = botMessage.MessageId;
 
-                InlineKeyboardMarkup inlineKeyboard = new(new[]
-                {
-                    new[] // url
-                    {
-                        InlineKeyboardButton.WithUrl(
-                            text: "Открыть аккаунт через инстаграм",
-                            url: user.Url
-                        )
-                    },
-                    new[] // edit data
-                    {
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "1",
-                            callbackData: "editNickName"
-                        ),
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "2",
-                            callbackData: "editFullName"
-                        ),
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "3",
-                            callbackData: "editContactNumber"
-                        ),
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "4",
-                            callbackData: "editPublicNumber"
-                        ),
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "5",
-                            callbackData: "editCity"
-                        )
-                    },
-                    new[] // continue
-                    {
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "Перейти к следующему",
-                            callbackData: "nextUser"
-                        )
-                    },
-                    new[] // remove from list
-                    {
-                        InlineKeyboardButton.WithCallbackData(
-                            text: "Удалить аккаунт из списка",
-                            callbackData: "removeUser"
-                        )
-                    }
-                });
-
-                await botClient.SendTextMessageAsync(
-                    chatId: message.Chat.Id,
-                    text: text,
-                    replyMarkup: inlineKeyboard,
-                    parseMode: ParseMode.Markdown
-                );
-            }
-
-            return await botClient.SendTextMessageAsync(
+            await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 text: "Если список готов, нажмите кнопку ниже, чтобы создать Word-документ",
                 replyMarkup: new InlineKeyboardMarkup(new[]
@@ -150,6 +92,8 @@ public static class Events
                     )
                 })
             );
+
+            return await SendFollowerInfoMessage(userMessageStatement, message.Chat.Id, botClient);
         }
 
         static async Task<Message> SendDefaultAnswer(ITelegramBotClient botClient, Message message)
@@ -172,4 +116,131 @@ public static class Events
             );
         }
     }
+
+    public static async Task OnCallbackQueryReceivedEvent(ITelegramBotClient botClient, CallbackQuery callbackQuery)
+    {
+        var chatId = callbackQuery.Message!.Chat.Id;
+        var userMessageStatement = UserStatement.GetStatement(chatId);
+
+        if (userMessageStatement.Status != Status.WorkingWithFollowersList)
+            return;
+
+        var action = callbackQuery.Data switch
+        {
+            "nextUser" => SendFollowerInfoMessage(userMessageStatement, chatId, botClient, moveForward: true),
+            "pastUser" => SendFollowerInfoMessage(userMessageStatement, chatId, botClient, moveBack: true)
+        };
+
+        await action;
+    }
+
+    private static async Task<Message> SendFollowerInfoMessage(
+        UserMessageStatement userMessageStatement,
+        long chatId,
+        ITelegramBotClient botClient,
+        bool moveForward = false,
+        bool moveBack = false
+    )
+    {
+        if (moveForward)
+            userMessageStatement.IncrementIndex();
+        if (moveBack)
+            userMessageStatement.DecrementIndex();
+        
+        var nextUserDataIndex = userMessageStatement.NextUserDataIndex;
+        var userDataList = userMessageStatement.UserDataList;
+        var editMessageId = userMessageStatement.MessageId;
+
+        if (userDataList.Count == nextUserDataIndex || nextUserDataIndex < 0)
+        {
+            userMessageStatement.NextUserDataIndex = -1;
+
+            return await botClient.EditMessageTextAsync(
+                chatId: chatId,
+                messageId: editMessageId,
+                text: "Достигнута граница списка!",
+                replyMarkup: new InlineKeyboardMarkup(new[]
+                {
+                    InlineKeyboardButton.WithCallbackData(
+                        text: "Начать с начала",
+                        callbackData: "nextUser"
+                    )
+                })
+            );
+        }
+
+        var user = userDataList[nextUserDataIndex];
+
+        var text =
+            $"№{nextUserDataIndex + 1}\n" +
+            $"1. Пользователь *{user.UserName}*\n" +
+            $"2. Полное имя: `{user.FullName}`\n" +
+            $"3. Контактный номер: `{user.ContactNumber}`\n" +
+            $"4. Публичный номер: `{user.PublicNumber}`\n" +
+            $"5. Город: `{user.City}\n`" +
+            "\n*При наличии нужды имзенить некоторые свойства, нажмите 1-5 соответственно*";
+
+        var inlineKeyboard = CreateInlineReplyMarkupForFollowersList(user.Url);
+
+        return await botClient.EditMessageTextAsync(
+            chatId: chatId,
+            messageId: editMessageId,
+            text: text,
+            replyMarkup: inlineKeyboard,
+            parseMode: ParseMode.Markdown
+        );
+    }
+
+    private static InlineKeyboardMarkup CreateInlineReplyMarkupForFollowersList(string url) =>
+        new(new[]
+        {
+            new[] // url
+            {
+                InlineKeyboardButton.WithUrl(
+                    text: "Открыть аккаунт через инстаграм",
+                    url: url
+                )
+            },
+            new[] // edit data
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "1",
+                    callbackData: "editNickName"
+                ),
+                InlineKeyboardButton.WithCallbackData(
+                    text: "2",
+                    callbackData: "editFullName"
+                ),
+                InlineKeyboardButton.WithCallbackData(
+                    text: "3",
+                    callbackData: "editContactNumber"
+                ),
+                InlineKeyboardButton.WithCallbackData(
+                    text: "4",
+                    callbackData: "editPublicNumber"
+                ),
+                InlineKeyboardButton.WithCallbackData(
+                    text: "5",
+                    callbackData: "editCity"
+                )
+            },
+            new[] // go forward or back
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "Перейти к следующему",
+                    callbackData: "nextUser"
+                ),
+                InlineKeyboardButton.WithCallbackData(
+                    text: "Вернуться к предыдущему",
+                    callbackData: "pastUser"
+                )
+            },
+            new[] // remove from list
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "Удалить аккаунт из списка",
+                    callbackData: "removeUser"
+                )
+            }
+        });
 }

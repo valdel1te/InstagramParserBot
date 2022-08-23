@@ -33,7 +33,8 @@ public static class Handlers
     {
         var handler = update.Type switch
         {
-            UpdateType.Message => Events.OnMessageReceivedEvent(botClient, update.Message!)
+            UpdateType.Message => Events.OnMessageReceivedEvent(botClient, update.Message!),
+            UpdateType.CallbackQuery => Events.OnCallbackQueryReceivedEvent(botClient, update.CallbackQuery!)
         };
 
         try

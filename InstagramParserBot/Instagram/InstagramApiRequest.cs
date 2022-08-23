@@ -117,18 +117,28 @@ public static class InstagramApiRequest
             if (keyWords.Any(key =>
                     userFullData.Username.Contains(key)
                     || userFullData.Biography.Contains(key)
-                    || userFullData.FullName.Contains(key)
-                )
+                    || userFullData.FullName.Contains(key))
                )
             {
+                var publicPhone = userFullData.PublicPhoneNumber.Replace("+7", "8");
+                var contactPhone = userFullData.ContactPhoneNumber.Replace("+7", "8");
+
+                if (NumberBase.GetBaseList().Any(number =>
+                        publicPhone.Equals(number)
+                        || contactPhone.Equals(number))
+                   )
+                {
+                    continue;
+                }
+
                 Console.WriteLine("[API REQUEST STATUS] Found one user!!");
 
                 sortedList.Add(new InstagramUserData
                 {
                     UserName = userFullData.Username,
                     FullName = userFullData.FullName,
-                    ContactNumber = userFullData.ContactPhoneNumber,
-                    PublicNumber = userFullData.PublicPhoneNumber.Replace("+7", "8"),
+                    ContactNumber = contactPhone,
+                    PublicNumber = publicPhone,
                     Url = $"https://www.instagram.com/{userFullData.Username}/",
                     City = userFullData.CityName,
                     OtherInfo = userFullData
@@ -137,6 +147,9 @@ public static class InstagramApiRequest
         }
 
         return sortedList;
+        /*.OrderByDescending(follower => follower.City.Contains("Moscow"))
+        .ThenBy(follower => follower.City)
+        .ToList();*/
     }
 
     public static async Task<int> GetUserFollowersCount(InstaUser user)
