@@ -17,7 +17,12 @@ public static class UserStatement
 public enum Status
 {
     WaitingWithNumbersBase,
-    WorkingWithFollowersList
+    WorkingWithFollowersList,
+    EditingFollowersUserName,
+    EditingFollowersFullName,
+    EditingFollowersPublicNumber,
+    EditingFollowersContactNumber,
+    EditingFollowersCity
 }
 
 public sealed class UserMessageStatement

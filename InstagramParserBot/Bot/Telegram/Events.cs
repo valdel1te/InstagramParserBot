@@ -1,4 +1,5 @@
-﻿using InstagramParserBot.Instagram;
+﻿using System.Diagnostics;
+using InstagramParserBot.Instagram;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -21,18 +22,43 @@ public static class Events
 
         var userStatement = UserStatement.GetStatement(message.Chat.Id);
 
-        if (userStatement.Status == Status.WorkingWithFollowersList)
+        if (userStatement.Status != Status.WaitingWithNumbersBase)
         {
-            if (int.TryParse(messageText, out var index))
+            if (userStatement.Status == Status.WorkingWithFollowersList)
             {
-                if (index >= 0 && index < userStatement.UserDataList.Count)
+                if (int.TryParse(messageText, out var index))
                 {
-                    userStatement.NextUserDataIndex = index - 1;
-                    await SendFollowerInfoMessage(userStatement, message.Chat.Id, botClient);
+                    if (index >= 0 && index < userStatement.UserDataList.Count)
+                    {
+                        userStatement.NextUserDataIndex = index - 1;
+                        await SendFollowerInfoMessage(userStatement, message.Chat.Id, botClient);
+                    }
                 }
+
+                await DeleteMessage(botClient, message);
+                return;
             }
 
+            if (userStatement.Status == Status.EditingFollowersUserName)
+                userStatement.UserDataList[userStatement.NextUserDataIndex].UserName = messageText;
+
+            if (userStatement.Status == Status.EditingFollowersFullName)
+                userStatement.UserDataList[userStatement.NextUserDataIndex].FullName = messageText;
+
+            if (userStatement.Status == Status.EditingFollowersPublicNumber)
+                userStatement.UserDataList[userStatement.NextUserDataIndex].PublicNumber = messageText;
+
+            if (userStatement.Status == Status.EditingFollowersContactNumber)
+                userStatement.UserDataList[userStatement.NextUserDataIndex].ContactNumber = messageText;
+
+            if (userStatement.Status == Status.EditingFollowersCity)
+                userStatement.UserDataList[userStatement.NextUserDataIndex].City = messageText;
+
+            await SendFollowerInfoMessage(userStatement, message.Chat.Id, botClient);
             await DeleteMessage(botClient, message);
+
+            userStatement.Status = Status.WorkingWithFollowersList;
+            
             return;
         }
 
@@ -51,7 +77,7 @@ public static class Events
             _ => SendDefaultAnswer(botClient, message)
         };
 
-        var messageSent = await action;
+        await action;
         Console.WriteLine($"[BOT STATUS] Sent message to {message.From.Username}");
 
         static async Task<Message> StartParseFollowers(
@@ -145,10 +171,81 @@ public static class Events
         var action = callbackQuery.Data switch
         {
             "nextUser" => SendFollowerInfoMessage(userMessageStatement, chatId, botClient, moveForward: true),
-            "pastUser" => SendFollowerInfoMessage(userMessageStatement, chatId, botClient, moveBack: true)
+            "pastUser" => SendFollowerInfoMessage(userMessageStatement, chatId, botClient, moveBack: true),
+            "getShortInfoList" => SendShortInfoFollowersList(userMessageStatement, chatId, botClient),
+            "editNickName" => EditUserInfo(userMessageStatement, chatId, botClient, Status.EditingFollowersUserName),
+            "editFullName" => EditUserInfo(userMessageStatement, chatId, botClient, Status.EditingFollowersFullName),
+            "editContactNumber" => EditUserInfo(userMessageStatement, chatId, botClient,
+                Status.EditingFollowersContactNumber),
+            "editPublicNumber" => EditUserInfo(userMessageStatement, chatId, botClient,
+                Status.EditingFollowersPublicNumber),
+            "editCity" => EditUserInfo(userMessageStatement, chatId, botClient, Status.EditingFollowersCity),
         };
 
         await action;
+
+        static async Task<Message> SendShortInfoFollowersList(
+            UserMessageStatement userMessageStatement,
+            long chatId,
+            ITelegramBotClient botClient
+        )
+        {
+            var text = "";
+            for (var i = 0; i < userMessageStatement.UserDataList.Count; i++)
+                text += $"{i + 1}. {userMessageStatement.UserDataList[i].UserName}\n";
+
+            userMessageStatement.DecrementIndex();
+
+            return await botClient.EditMessageTextAsync(
+                chatId: chatId,
+                messageId: userMessageStatement.MessageId,
+                text: text,
+                replyMarkup: new InlineKeyboardMarkup(new[]
+                {
+                    InlineKeyboardButton.WithCallbackData(
+                        text: "Вернуться к подробному списку",
+                        callbackData: "nextUser"
+                    )
+                })
+            );
+        }
+
+        static async Task<Message> EditUserInfo(
+            UserMessageStatement userMessageStatement,
+            long chatId,
+            ITelegramBotClient botClient,
+            Status status
+        )
+        {
+            userMessageStatement.Status = status;
+            var username = userMessageStatement.UserDataList[userMessageStatement.NextUserDataIndex].UserName;
+
+            var text = status switch
+            {
+                Status.EditingFollowersUserName => $"УКАЖИТЕ НОВЫЙ НИКНЕЙМ ДЛЯ `{username}`",
+                Status.EditingFollowersFullName => $"УКАЖИТЕ НОВОЕ ПОЛНОЕ ИМЯ ДЛЯ `{username}`",
+                Status.EditingFollowersPublicNumber => $"УКАЖИТЕ НОВЫЙ ПУБЛИЧНЫЙ НОМЕР ДЛЯ `{username}`",
+                Status.EditingFollowersContactNumber => $"УКАЖИТЕ НОВЫЙ КОНТАКТНЫЙ НОМЕР ДЛЯ `{username}`",
+                Status.EditingFollowersCity => $"УКАЖИТЕ НОВЫЙ ГОРОД ДЛЯ `{username}`",
+                _ => "Что-то пошло не так, отмените действие"
+            };
+
+            //userMessageStatement.DecrementIndex();
+
+            return await botClient.EditMessageTextAsync(
+                chatId: chatId,
+                messageId: userMessageStatement.MessageId,
+                text: text,
+                replyMarkup: new InlineKeyboardMarkup(new[]
+                {
+                    InlineKeyboardButton.WithCallbackData(
+                        text: "Отменить",
+                        callbackData: "nextUser"
+                    )
+                }),
+                parseMode: ParseMode.Markdown
+            );
+        }
     }
 
     private static async Task<Message> SendFollowerInfoMessage(
@@ -261,6 +358,13 @@ public static class Events
                 InlineKeyboardButton.WithCallbackData(
                     text: "Удалить аккаунт из списка",
                     callbackData: "removeUser"
+                )
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData(
+                    text: "Вывести краткий список аккаунтов",
+                    callbackData: "getShortInfoList"
                 )
             }
         });

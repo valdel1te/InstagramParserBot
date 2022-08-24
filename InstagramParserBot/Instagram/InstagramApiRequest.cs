@@ -147,9 +147,6 @@ public static class InstagramApiRequest
         }
 
         return sortedList;
-        /*.OrderByDescending(follower => follower.City.Contains("Moscow"))
-        .ThenBy(follower => follower.City)
-        .ToList();*/
     }
 
     public static async Task<int> GetUserFollowersCount(InstaUser user)

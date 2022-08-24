@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using InstagramParserBot.Bot;
 using InstagramParserBot.Instagram;
-using InstagramParserBot.Tools;
 
 Console.OutputEncoding = Encoding.Unicode; // enable russian lang and other
 
