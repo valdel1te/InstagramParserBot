@@ -58,7 +58,7 @@ public static class Events
             await DeleteMessage(botClient, message);
 
             userStatement.Status = Status.WorkingWithFollowersList;
-            
+
             return;
         }
 
@@ -180,6 +180,7 @@ public static class Events
             "editPublicNumber" => EditUserInfo(userMessageStatement, chatId, botClient,
                 Status.EditingFollowersPublicNumber),
             "editCity" => EditUserInfo(userMessageStatement, chatId, botClient, Status.EditingFollowersCity),
+            "removeUser" => RemoveUserFromList(userMessageStatement, chatId, botClient),
         };
 
         await action;
@@ -214,13 +215,13 @@ public static class Events
             UserMessageStatement userMessageStatement,
             long chatId,
             ITelegramBotClient botClient,
-            Status status
+            Status editStatus
         )
         {
-            userMessageStatement.Status = status;
+            userMessageStatement.Status = editStatus;
             var username = userMessageStatement.UserDataList[userMessageStatement.NextUserDataIndex].UserName;
 
-            var text = status switch
+            var text = editStatus switch
             {
                 Status.EditingFollowersUserName => $"УКАЖИТЕ НОВЫЙ НИКНЕЙМ ДЛЯ `{username}`",
                 Status.EditingFollowersFullName => $"УКАЖИТЕ НОВОЕ ПОЛНОЕ ИМЯ ДЛЯ `{username}`",
@@ -229,8 +230,6 @@ public static class Events
                 Status.EditingFollowersCity => $"УКАЖИТЕ НОВЫЙ ГОРОД ДЛЯ `{username}`",
                 _ => "Что-то пошло не так, отмените действие"
             };
-
-            //userMessageStatement.DecrementIndex();
 
             return await botClient.EditMessageTextAsync(
                 chatId: chatId,
@@ -245,6 +244,21 @@ public static class Events
                 }),
                 parseMode: ParseMode.Markdown
             );
+        }
+
+        static async Task RemoveUserFromList(
+            UserMessageStatement userMessageStatement,
+            long chatId,
+            ITelegramBotClient botClient
+        )
+        {
+            var index = userMessageStatement.NextUserDataIndex;
+            var deletedUser = userMessageStatement.UserDataList[index];
+            userMessageStatement.UserDataList.RemoveAt(index);
+
+            Console.WriteLine($"[BOT STATUS] Removed user from list: {deletedUser.UserName}");
+
+            await SendFollowerInfoMessage(userMessageStatement, chatId, botClient);
         }
     }
 
@@ -292,7 +306,7 @@ public static class Events
             $"3. Контактный номер: `{user.ContactNumber}`\n" +
             $"4. Публичный номер: `{user.PublicNumber}`\n" +
             $"5. Город: `{user.City}\n`" +
-            "\n*При наличии нужды имзенить некоторые свойства, нажмите 1-5 соответственно*\n" +
+            "\n*При наличии нужды изменить некоторые свойства, нажмите 1-5 соответственно*\n" +
             "_Чтобы выбрать конкретный номер аккаунта в списке, отправьте ниже соответствующий индекс_";
 
         var inlineKeyboard = CreateInlineReplyMarkupForFollowersList(user.Url);

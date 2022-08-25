@@ -15,7 +15,7 @@ public static class InstagramApiRequest
 
     private static async Task StartRequest()
     {
-        await Delay.WaitThreeSeconds();
+        await Delay.WaitOneSecond();
 
         _requestCount++;
 
@@ -124,14 +124,15 @@ public static class InstagramApiRequest
                 var contactPhone = userFullData.ContactPhoneNumber.Replace("+7", "8");
 
                 if (NumberBase.GetBaseList().Any(number =>
-                        publicPhone.Equals(number)
-                        || contactPhone.Equals(number))
+                        publicPhone.Equals(number) || contactPhone.Equals(number))
                    )
                 {
                     continue;
                 }
 
                 Console.WriteLine("[API REQUEST STATUS] Found one user!!");
+
+                var city = userFullData.CityName;
 
                 sortedList.Add(new InstagramUserData
                 {
@@ -140,7 +141,7 @@ public static class InstagramApiRequest
                     ContactNumber = contactPhone,
                     PublicNumber = publicPhone,
                     Url = $"https://www.instagram.com/{userFullData.Username}/",
-                    City = userFullData.CityName,
+                    City = city,
                     OtherInfo = userFullData
                 });
             }

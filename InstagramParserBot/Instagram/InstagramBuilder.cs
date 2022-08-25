@@ -71,14 +71,14 @@ public static class InstagramBuilder
 
             await _instaApi.SendRequestsBeforeLoginAsync();
 
-            await Delay.WaitThreeSeconds();
+            await Delay.WaitOneSecond();
 
             var loginResult = await _instaApi.LoginAsync();
 
             if (loginResult.Succeeded && userSession.UserName == settings.GetUserName())
             {
                 Console.WriteLine($"[INSTAGRAM API STATUS] Connected as {userSession.UserName}");
-                await Delay.WaitThreeSeconds();
+                await Delay.WaitOneSecond();
                 await _instaApi.SendRequestsAfterLoginAsync();
             }
             else
