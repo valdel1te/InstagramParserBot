@@ -1,5 +1,4 @@
 ﻿using InstagramParserBot.Instagram;
-using Telegram.Bot.Types;
 
 namespace InstagramParserBot.Bot;
 

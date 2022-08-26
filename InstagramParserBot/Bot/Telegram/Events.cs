@@ -1,9 +1,11 @@
-﻿using System.Diagnostics;
-using InstagramParserBot.Instagram;
+﻿using InstagramParserBot.Instagram;
+using InstagramParserBot.Tools;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
+using File = System.IO.File;
 
 namespace InstagramParserBot.Bot.Telegram;
 
@@ -181,9 +183,48 @@ public static class Events
                 Status.EditingFollowersPublicNumber),
             "editCity" => EditUserInfo(userMessageStatement, chatId, botClient, Status.EditingFollowersCity),
             "removeUser" => RemoveUserFromList(userMessageStatement, chatId, botClient),
+            "printWordDocument" => SendDocumentAndEndProcess(userMessageStatement, chatId, botClient)
         };
 
         await action;
+
+        static async Task<Message> SendDocumentAndEndProcess(
+            UserMessageStatement userMessageStatement,
+            long chatId,
+            ITelegramBotClient botClient
+        )
+        {
+            var dataList = userMessageStatement.UserDataList;
+
+            MicrosoftOfficeService.SendWordDocument(dataList);
+
+            Console.WriteLine($"[BOT STATUS] PRINTING WORD DOCUMENT");
+
+            var documentName = $"accounts{DateTime.Today:ddMM}.docx";
+
+            await using Stream streamPath =
+                File.OpenRead(@$"{Directory.GetCurrentDirectory()}/{documentName}");
+
+            var newNumbers = dataList.Select(user => user.ContactNumber).ToList();
+            NumberBase.AppendBase(newNumbers);
+            
+            UserStatement.RemoveUser(chatId);
+            
+            await botClient.SendDocumentAsync(
+                chatId: chatId,
+                document: new InputOnlineFile(
+                    content: streamPath,
+                    fileName: documentName
+                )
+            );
+
+            return await botClient.SendTextMessageAsync(
+                chatId: chatId,
+                text:
+                $"Составлен список из {dataList.Count} пользователей!" +
+                $"\nЗабавный факт: если кто-то действительно пользуется этим ботом, то с него {dataList.Count * 4} руб"
+            );
+        }
 
         static async Task<Message> SendShortInfoFollowersList(
             UserMessageStatement userMessageStatement,
@@ -356,15 +397,15 @@ public static class Events
                     callbackData: "editCity"
                 )
             },
-            new[] // go forward or back
+            new[] // go back or forward
             {
                 InlineKeyboardButton.WithCallbackData(
-                    text: "Перейти к следующему",
-                    callbackData: "nextUser"
+                    text: "◀️Вернуться к предыдущему",
+                    callbackData: "pastUser"
                 ),
                 InlineKeyboardButton.WithCallbackData(
-                    text: "Вернуться к предыдущему",
-                    callbackData: "pastUser"
+                    text: "Перейти к следующему ▶️",
+                    callbackData: "nextUser"
                 )
             },
             new[] // remove from list

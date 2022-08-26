@@ -2,14 +2,14 @@
 
 public static class NumberBase
 {
-    private static List<string> _phoneNumbersBase;
+    private static readonly List<string> PhoneNumbersBase;
     private static readonly string FilePath;
 
     static NumberBase()
     {
         FilePath = 
             Directory.GetParent(Environment.CurrentDirectory)!.Parent!.Parent!.FullName + "/phone_numbers.txt";
-        _phoneNumbersBase = ReadTxtBase();
+        PhoneNumbersBase = ReadTxtBase();
     }
     
     private static List<string> ReadTxtBase()
@@ -31,12 +31,19 @@ public static class NumberBase
         return numbers;
     }
 
-    public static List<string> GetBaseList() => _phoneNumbersBase;
+    public static List<string> GetBaseList() => PhoneNumbersBase;
 
-    public static void OverrideBase(List<string> newBase)
+    public static void AppendBase(List<string> newBase)
     {
-        _phoneNumbersBase = newBase;
-        File.WriteAllLines(FilePath, _phoneNumbersBase);
+        for (var index = 0; index < newBase.Count; index++)
+        {
+            var number = newBase[index];
+            if (string.IsNullOrEmpty(number))
+                newBase.Remove(number);
+        }
+
+        PhoneNumbersBase.AddRange(newBase);
+        File.WriteAllLines(FilePath, PhoneNumbersBase);
         
         Console.WriteLine("[NUMBER BASE STATUS] Base updated!");
     }

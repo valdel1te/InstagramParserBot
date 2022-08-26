@@ -123,16 +123,15 @@ public static class InstagramApiRequest
                 var publicPhone = userFullData.PublicPhoneNumber.Replace("+7", "8");
                 var contactPhone = userFullData.ContactPhoneNumber.Replace("+7", "8");
 
-                if (NumberBase.GetBaseList().Any(number =>
-                        publicPhone.Equals(number) || contactPhone.Equals(number))
-                   )
-                {
+                if (string.IsNullOrEmpty(contactPhone))
                     continue;
-                }
+
+                if (NumberBase.GetBaseList().Any(number => publicPhone.Equals(number) || contactPhone.Equals(number)))
+                    continue;
 
                 Console.WriteLine("[API REQUEST STATUS] Found one user!!");
 
-                var city = userFullData.CityName;
+                var city = MicrosoftOfficeService.TranslateFromExcelFile(userFullData.CityName);
 
                 sortedList.Add(new InstagramUserData
                 {
