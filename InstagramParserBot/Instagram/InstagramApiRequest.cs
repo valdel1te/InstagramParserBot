@@ -122,11 +122,13 @@ public static class InstagramApiRequest
             {
                 var publicPhone = userFullData.PublicPhoneNumber.Replace("+7", "8");
                 var contactPhone = userFullData.ContactPhoneNumber.Replace("+7", "8");
-
-                if (string.IsNullOrEmpty(contactPhone))
-                    continue;
-
+                
+                /*
                 if (NumberBase.GetBaseList().Any(number => publicPhone.Equals(number) || contactPhone.Equals(number)))
+                    //continue;
+                */    
+                
+                if (MicrosoftOfficeService.DatabaseHasUser(userFullData.Username, contactPhone))
                     continue;
 
                 Console.WriteLine("[API REQUEST STATUS] Found one user!!");

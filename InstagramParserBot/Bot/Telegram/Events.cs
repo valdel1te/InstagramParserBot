@@ -194,6 +194,11 @@ public static class Events
             ITelegramBotClient botClient
         )
         {
+            await botClient.SendTextMessageAsync(
+                chatId: chatId,
+                text: "Пополняю базу аккаунтов и составляю документ.."
+            );
+
             var dataList = userMessageStatement.UserDataList;
 
             MicrosoftOfficeService.SendWordDocument(dataList);
@@ -205,11 +210,15 @@ public static class Events
             await using Stream streamPath =
                 File.OpenRead(@$"{Directory.GetCurrentDirectory()}/{documentName}");
 
+            /*
             var newNumbers = dataList.Select(user => user.ContactNumber).ToList();
             NumberBase.AppendBase(newNumbers);
-            
+            */
+
+            MicrosoftOfficeService.AddUsersToDatabase(dataList);
+
             UserStatement.RemoveUser(chatId);
-            
+
             await botClient.SendDocumentAsync(
                 chatId: chatId,
                 document: new InputOnlineFile(
@@ -222,7 +231,7 @@ public static class Events
                 chatId: chatId,
                 text:
                 $"Составлен список из {dataList.Count} пользователей!" +
-                $"\nЗабавный факт: если кто-то действительно пользуется этим ботом, то с него {dataList.Count * 4} руб"
+                $"\nЗабавный факт: если кто-то действительно пользуется этим ботом, то с него {dataList.Count * 5} руб"
             );
         }
 
@@ -342,7 +351,7 @@ public static class Events
 
         var text =
             $"№{nextUserDataIndex + 1}\n" +
-            $"1. Пользователь *{user.UserName}*\n" +
+            $"1. Пользователь `{user.UserName}`\n" +
             $"2. Полное имя: `{user.FullName}`\n" +
             $"3. Контактный номер: `{user.ContactNumber}`\n" +
             $"4. Публичный номер: `{user.PublicNumber}`\n" +

@@ -25,7 +25,7 @@ public static class NumberBase
         }
         
         numbers.AddRange(File.ReadAllLines(FilePath));
-        
+        numbers.RemoveAll(string.IsNullOrEmpty);
         Console.WriteLine("[NUMBER BASE STATUS] Parsed successfully!");
         
         return numbers;
